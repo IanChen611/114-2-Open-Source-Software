@@ -1,15 +1,26 @@
-CC := gcc
-CFLAGS := -std=c11 -Wall -Wextra -pedantic -O2
+CC      := gcc
+CFLAGS  := -std=c11 -Wall -Wextra -pedantic -O2
 LDFLAGS := -pthread
-TARGET := sudoku_validator
-SRC := main.c
+KDIR    ?= $(HOME)/WSL2-Linux-Kernel
 
-all: $(TARGET)
+# kernel module target
+obj-m += sudoku_module.o
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+.PHONY: all userspace clean
+
+# default: build the kernel module
+all:
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+# build the userspace sudoku validator (main.c) and the CLI client
+userspace: sudoku_validator sudoku-cli
+
+sudoku_validator: main.c
+	$(CC) $(CFLAGS) main.c -o sudoku_validator $(LDFLAGS)
+
+sudoku-cli: sudoku-cli.c sudoku.h
+	$(CC) $(CFLAGS) sudoku-cli.c -o sudoku-cli
 
 clean:
-	rm -f $(TARGET)
-
-.PHONY: all clean
+	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	rm -f sudoku_validator sudoku-cli

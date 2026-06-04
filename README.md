@@ -100,14 +100,6 @@ static uint8_t fixed[9][9];     // 謎題初始給定格（唯讀）
 
 **pre-commit hook** 放置於 `.git/hooks/pre-commit`，每次提交前自動執行使用者空間的單元測試框架。該框架將核心數獨邏輯（獨立編譯為靜態函式庫，與模組膠合程式碼分離）連結後執行驗證測試；若任何測試失敗，提交將被拒絕。
 
-**commit-msg hook** 強制執行課程要求的提交訊息格式：
-
-```
-[Feature Addition] add backtracking puzzle generator
-[Bug Fixing] fix off-by-one in box constraint check
-[Refactoring] extract validator into separate translation unit
-```
-
 ---
 
 ## 5. 開發時程

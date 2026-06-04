@@ -1,0 +1,12 @@
+# kernel module build artifacts
+*.ko
+*.o
+*.mod
+*.mod.c
+*.order
+*.symvers
+.*.cmd
+
+# userspace binaries
+sudoku_validator
+sudoku-cli
