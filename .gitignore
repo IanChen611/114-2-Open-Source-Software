@@ -10,3 +10,6 @@
 # userspace binaries
 sudoku_validator
 sudoku-cli
+
+# integration test logs
+integration-test.log

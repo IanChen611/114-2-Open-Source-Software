@@ -19,12 +19,15 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/random.h>
+#include <linux/string.h>
 #include <linux/uaccess.h>
 #include "sudoku.h"
 
 #define DEVICE_NAME "sudoku"
 #define CLASS_NAME  "sudoku"
 #define SIZE        9
+#define EMPTY_CELLS 40
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Chen Yi-Yang & Du Yong-Lin");
@@ -120,17 +123,18 @@ static int validate_box(int box)
 
 /*
  * is_move_valid - check if placing val at (row, col) violates any constraint.
- * The cell must currently be 0.  We temporarily place val, validate, restore.
+ * Temporarily place val, validate, then restore the previous cell value.
  */
 static int is_move_valid(int row, int col, uint8_t val)
 {
+	uint8_t old = board[row][col];
 	int ok;
 
 	board[row][col] = val;
 	ok = validate_row(row) &&
 	     validate_col(col) &&
 	     validate_box((row / 3) * 3 + col / 3);
-	board[row][col] = 0;
+	board[row][col] = old;
 	return ok;
 }
 
@@ -147,7 +151,106 @@ static uint8_t get_status(void)
 
 /* ── game control ───────────────────────────────────────────────────── */
 
-static void load_new_game(void)
+static u32 random_below(u32 limit)
+{
+	return get_random_u32() % limit;
+}
+
+static void shuffle_values(uint8_t values[], int count)
+{
+	int i;
+
+	for (i = count - 1; i > 0; i--) {
+		int j = random_below(i + 1);
+		uint8_t tmp = values[i];
+
+		values[i] = values[j];
+		values[j] = tmp;
+	}
+}
+
+static int can_place(const uint8_t grid[SIZE][SIZE], int row, int col,
+		     uint8_t val)
+{
+	int i;
+	int start_row = (row / 3) * 3;
+	int start_col = (col / 3) * 3;
+	int r, c;
+
+	for (i = 0; i < SIZE; i++) {
+		if (grid[row][i] == val || grid[i][col] == val)
+			return 0;
+	}
+
+	for (r = start_row; r < start_row + 3; r++)
+		for (c = start_col; c < start_col + 3; c++)
+			if (grid[r][c] == val)
+				return 0;
+
+	return 1;
+}
+
+static int fill_solution_grid(uint8_t grid[SIZE][SIZE], int cell)
+{
+	uint8_t values[SIZE] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+	int row, col, i;
+
+	if (cell == SIZE * SIZE)
+		return 1;
+
+	row = cell / SIZE;
+	col = cell % SIZE;
+
+	if (grid[row][col] != 0)
+		return fill_solution_grid(grid, cell + 1);
+
+	shuffle_values(values, SIZE);
+	for (i = 0; i < SIZE; i++) {
+		if (!can_place(grid, row, col, values[i]))
+			continue;
+
+		grid[row][col] = values[i];
+		if (fill_solution_grid(grid, cell + 1))
+			return 1;
+		grid[row][col] = 0;
+	}
+
+	return 0;
+}
+
+static void remove_cells_from_puzzle(uint8_t generated_puzzle[SIZE][SIZE])
+{
+	uint8_t positions[SIZE * SIZE];
+	int i;
+
+	for (i = 0; i < SIZE * SIZE; i++)
+		positions[i] = i;
+	shuffle_values(positions, SIZE * SIZE);
+
+	for (i = 0; i < EMPTY_CELLS; i++) {
+		int pos = positions[i];
+
+		generated_puzzle[pos / SIZE][pos % SIZE] = 0;
+	}
+}
+
+static void commit_game_state(uint8_t generated_puzzle[SIZE][SIZE],
+			      uint8_t generated_solution[SIZE][SIZE])
+{
+	int r, c;
+
+	for (r = 0; r < SIZE; r++) {
+		for (c = 0; c < SIZE; c++) {
+			puzzle[r][c] = generated_puzzle[r][c];
+			solution[r][c] = generated_solution[r][c];
+			board[r][c] = generated_puzzle[r][c];
+			fixed_cells[r][c] =
+				(generated_puzzle[r][c] != 0) ? 1 : 0;
+		}
+	}
+}
+
+static void load_default_game(void)
 {
 	int r, c;
 
@@ -159,7 +262,26 @@ static void load_new_game(void)
 			fixed_cells[r][c] = (default_puzzle[r][c] != 0) ? 1 : 0;
 		}
 	}
-	pr_info("sudoku: new game loaded\n");
+	pr_info("sudoku: default game loaded\n");
+}
+
+static void load_new_game(void)
+{
+	uint8_t generated_solution[SIZE][SIZE] = {};
+	uint8_t generated_puzzle[SIZE][SIZE];
+
+	if (!fill_solution_grid(generated_solution, 0)) {
+		pr_warn("sudoku: generator failed, loading default puzzle\n");
+		load_default_game();
+		return;
+	}
+
+	memcpy(generated_puzzle, generated_solution, sizeof(generated_puzzle));
+	remove_cells_from_puzzle(generated_puzzle);
+	commit_game_state(generated_puzzle, generated_solution);
+
+	pr_info("sudoku: generated new game with %d empty cells\n",
+		EMPTY_CELLS);
 }
 
 /* ── char device bookkeeping ─────────────────────────────────────────── */

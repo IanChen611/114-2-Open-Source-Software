@@ -38,10 +38,13 @@
 ## 同學 A（1 份）
 
 ### 核心模組（待完成）
-- [ ] 實作核心空間的謎題生成器（使用 `get_random_u32()` 取代 `rand()`，回溯法填滿棋盤後隨機移除 40 格）
+- [x] 實作核心空間的謎題生成器（使用 `get_random_u32()` 取代 `rand()`，回溯法填滿棋盤後隨機移除 40 格）
 
 ### 最終整合測試（待完成）
-- [ ] 在乾淨的 WSL2 環境上從零執行全部流程，確認整體功能正常
+- [x] 在乾淨的 WSL2 環境上從零執行全部流程，確認整體功能正常
+  - [x] 新增 `make prepare-wsl2-kernel`，自動安裝依賴、clone 對應 WSL2 kernel branch，並建立可編外部 module 的 build tree
+  - [x] 新增 `make integration-test`，自動執行 userspace build、kernel module build、載入 `/dev/sudoku`、CLI smoke test 與卸載
+  - [x] 於可登入的乾淨 WSL2 Ubuntu 環境執行並記錄結果
 
 ### 期末簡報（待完成）
 - [ ] 負責自己部分的投影片（謎題生成器演算法、整合測試結果）
